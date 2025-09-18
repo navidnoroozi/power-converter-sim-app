@@ -54,7 +54,7 @@ def index():
         # t_0: Initial time in seconds
         # sim_time: Total simulation time in seconds
         # sampling_rate: Sampling rate in seconds (also the time step for simulation)
-        sampling_time = float(request.form.get("sampling_time"))  # Sampling time in seconds
+        sampling_time = 25e-6 # TO DO: Fixed for now, previously was -> float(request.form.get("sampling_time"))  # Sampling time in seconds
         sim_time = float(request.form.get("sim_time"))  # Total simulation time in seconds
         t_0 = 0.0  # Fixed to 0.0 seconds for now
 

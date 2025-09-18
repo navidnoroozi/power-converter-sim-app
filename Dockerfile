@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt .
 
+# Try to add --upgrade if you face any issues with package versions
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .

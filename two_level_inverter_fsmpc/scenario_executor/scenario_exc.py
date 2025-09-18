@@ -28,14 +28,14 @@ def sim_executor(load, inverter, mpc, currentReference, s0, t_0 = 0, i_a_0 = 0, 
     current_time = t_0
     while current_time < sim_time:
         s_sig, cost_func_val_np = mpc.solveMPC(inverter,load,currentReference,current_time,i_a_0,s0)
-        i_a_next = load.calculateLoadDynamics(i_a_0,inverter.generateOutputVoltage([s_sig.value[0]]),current_time,sampling_rate)[-1]
+        i_a_next = load.calculateLoadDynamics(i_a_0,inverter.generateOutputVoltage([s_sig[0]]),current_time,sampling_rate)[-1]
         i_ref_next = currentReference.generateRefTrajectory(current_time)
         i_a_traj.append(i_a_next)
         i_ref_traj.append(i_ref_next[0])
         t_sim.append(current_time)
         cost_func_val.append(float(cost_func_val_np))
-        s_traj.append(s_sig.value[0])
-        for i, s in enumerate(s_sig.value):
+        s_traj.append(s_sig[0])
+        for i, s in enumerate(s_sig):
             if s <= 0.5:
                 s0[i] = False
             else:
