@@ -1,0 +1,210 @@
+
+header {
+    text-align: left;
+    margin-bottom: 0.4em;
+    padding-bottom: 0.1em;
+    border-bottom: 1px solid #4a6e17;
+    background-color: inherit;
+    width: auto;
+    opacity: 0.7;
+    color: #4a6e17;
+}
+
+main {
+    color: #4353e0;
+    margin: 1.0em 2.0em 0 0.4em; /* top right bottom left */
+    padding: 0.5em 1.5em 0.5em 1.5em; /* top right bottom left */
+    width: auto;
+    max-width: 900px;
+    border: 10px solid #4a6e17;
+    background-color: #bac7d1;
+    border: 10px solid currentColor;
+    opacity: 0.7;
+}
+
+h1 {
+    font-size: 2.5em;
+    text-align: center;
+    color: #4a6e17;
+    margin-bottom: 0.2em;
+    font-family: sans-serif, 'Segoe UI', Tahoma, Geneva, Verdana;
+}
+
+html, body {
+    box-sizing: border-box;
+    font-family: system-ui, BlinkMacSystemFont, -apple-system, sans-serif, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, Arial;
+    background-color: transparent; /* background-color: #e3e3e3; */    
+    color: inherit; /* #505558; */
+}
+
+p {
+    line-height: 1.6;
+    font-size: 1.2em;
+}
+
+ul li {
+    margin-bottom: 0.4em;
+    font-size: 1.0rem;
+    color: #4a6e17;
+}
+
+
+.blue {
+    color: rgba(104, 104, 165,1);
+}
+
+.red_half_opacity {
+    color: rgba(243, 5, 5, 0.5);
+}
+
+.finger {
+    color: #e04a3f;
+    position: relative;
+    margin-left: auto;
+}
+
+/* Apply box-sizing to one elements */
+.element {
+    box-sizing: border-box;
+    position: relative;
+}
+
+.profile {
+    display: inline;
+    padding: 0;
+    text-align: left;
+    width: 15%;
+    height: 15%;
+}
+
+.inline_picture {
+    display: inline;
+    width: 30%;
+    height: 30%;
+}
+
+.input {
+    display: inline;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+}
+
+.input_param {
+    display: inline;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    width: 80%;
+}
+
+.select_param {
+    display: inline;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    width: 80%;
+    font-weight: bold;
+}
+
+
+.value_param {
+    display: inline;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-weight: bold;
+}
+
+.button {
+    width: 20%;
+    font-weight: bold;
+    background-color: #e0873f;
+    color: rgb(220, 227, 233);
+    border: none;
+    font-size: medium;
+    border-radius: 4px;
+    cursor: pointer;
+    display: block;
+    margin: 0 auto 0 auto; /* top right bottom left */
+    padding: 100rem auto;
+}
+
+.button:hover {
+    background: #4353e0;
+}
+
+.button__param {
+    display: inline;
+    padding: 0.65rem 0.7rem  0.6rem 0.7rem;
+    text-align: center;
+    width: 80%;
+    font-weight: bold;
+    background-color: #e0873f;
+    color: rgb(220, 227, 233);
+    font-size: medium;
+    border-radius: 4px;
+    cursor: pointer;
+    border: none;
+    margin: 0.15rem auto -2rem auto; /* top right bottom left */
+}
+
+.form {
+    width: 25rem;
+    color: #000;
+    background: #4e5380;
+    border-radius: 5px;
+    padding: 0.0001rem 1.5em 15px 1.0em; /* top right bottom left */
+    margin: 0 auto 0 auto; /* top right bottom left */
+    }
+
+.form__group {
+    color: #abad3a;
+    font-weight: bold;
+    flex-direction: column;
+    display: flex;
+    text-align: center;
+}
+
+.form__label {
+    text-align: center;
+    margin-bottom: 0.25rem;
+    font-size: 1.2em;
+}
+
+.form__label__param {
+    text-align: center;
+    margin-bottom: 0.25rem;
+    font-size: 1.2em;
+}
+
+/* Apply box-sizing to all elements */
+/*
+*,
+*:before,
+*:after {
+    box-sizing: inherit;
+}
+*/
+
+.row {
+      display: flex;              /* put children side by side */
+      align-items: left;       /* vertical alignment */
+      justify-content: space-around; /* add spacing */
+      margin: 0px;
+      padding: 2px;
+    }
+
+.section {
+    flex: 1;                   /* each section takes equal width */
+    text-align: left;
+    font-size: small;
+    flex-wrap: wrap; /* sets whether flex items are forced onto one line or can wrap onto multiple lines */
+    }
+
+.section img {
+      width: 80%;
+      height: auto;
+      border-radius: 4px;
+    }
+
+/* 🔹 Only shrink math inside .math */
+    .math mjx-container {
+      font-size: 0.5em;
+    }

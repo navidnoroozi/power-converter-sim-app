@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="Navid Noroozi">
+    <title>Two Level Inverter Current Controller</title>
+
+    <!-- Link to CSS in static folder -->
+    <link rel="stylesheet" href="/static/styles/main.css">
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <h1 class="blue">Current Control of a Two Level Inverter via MPC</h1>
+    <!-- Top Section: Image + Math -->
+    <div class="row">
+        <div class="section">
+            <h2 class="blue">Simulator Structure</h2>
+            <img class="inline_picture" src="/static/images/fsmpc-white.png" alt="Simulator Structure">
+        </div>
+        <div class="section" >
+            <h2 class="blue">Mathematical Description</h2>
+            <p>
+                Here we briefly go over the closed-loop current control system. The load is modeled as a series RL circuit with a back EMF voltage source.
+                 The load dynamics is described by the following differential equation:
+            </p>
+            <p class="math">
+                $$ \normalsize \frac {di_a}{dt} = \big ( v_a - e_{bemf} + R i_a \big ) / L$$
+            </p>
+            <p>
+                where all the variables \( \normalsize v_a, i_a , e_{bemf} \) as well as the load parameters \( \normalsize R, L \) are illustrated in the picture.
+            </p>
+        </div>
+    </div>
+    <!-- Input Form -->
+    <h2 class="blue">Simulator Parameters</h2>
+        <form method="POST">
+            <h3 class="blue">Simulation Parameters</h3>
+            <div class="row">
+                <div class="section">
+                        <label class="form__label__param">Simulation Time (s)</label>
+                        <input type="number" step="0.0001"  min="0.0002" class="input_param" name="sim_time" required>
+                </div>
+                <div class="section">
+                        <label class="form__label__param">Sampling Time (s)</label>
+                        <input type="number" step="0.000001"  min="0.000001" class="input_param" name="sampling_time" required>
+                </div>
+                <div class="section">
+                        <label class="form__label__param">Control Horizon</label>
+                        <input type="number" step="1"  min="1" class="input_param" name="control_horizon" required>
+                </div>
+                <div class="section">
+                        <label class="form__label__param">MPC Method</label>
+                        <br>
+                        <select class="select_param" name="mpc_method" required>
+                            <option class="value_param" value="fs-mpc">FS-MPC</option>
+                            <option class="value_param" value="cs-mpc">CS-MPC/PWM</option>
+                        </select>
+                </div>
+            </div>
+            <h3 class="blue">Grid/Inverter Parameters</h3>
+            <div class="row">
+                <div class="section">
+                        <label class="form__label__param">Required Active Power (W)</label>
+                        <input type="number" step="1"  min="100.0" class="input_param" name="P_req" required>
+                </div>
+                <div class="section">
+                        <label class="form__label__param">Required Reactive Power (VAR)</label>
+                        <input type="number" step="1"  min="0.0" class="input_param" name="Q_req" required>
+                </div>
+                <div class="section">
+                        <label class="form__label__param">Nominal RMS Voltage (V)</label>
+                        <input type="number" step="1"  min="10.0" class="input_param" class="input_param" name="V_rms_req" required>
+                </div>
+            </div>
+            <h3 class="blue">Load Parameters</h3>
+            <div class="row">
+                <div class="section">
+                        <label class="form__label__param">Load Resistance (Ohm)</label>
+                        <input type="number" step="1"  min="0.0" class="input_param" name="R" required>
+                </div>
+                <div class="section">
+                        <label class="form__label__param">Load Inductance (H)</label>
+                        <input type="number" step="0.001"  min="0.0" class="input_param" name="L" required>
+                </div>
+                <div class="section">
+                        <label class="form__label__param">Back EMF Voltage (V)</label>
+                        <input type="number" step="1"  min="0.0" class="input_param" name="V_backemf" required>
+                </div>
+                <div class="section">
+                    <br>
+                    <button class="button__param" type="submit">Run Simulation</button>
+                </div>
+            </div>
+        </form>
+        <!-- Results Section -->
+     <br>
+    <!-- Show results section only if either plot is available -->
+    {% if filename1 or filename2 %}
+    <div>
+        <h2 class="blue">Simulation Results</h2>
+        <div class="row">   
+            <div class="section">
+                <h3 class="blue">Switching Signal & Load Current</h3>
+                {% if filename1 %}
+                <img class="inline_picture" src="{{ filename1 }}?v={{ uuid }}" alt="Load Current and Switching Signal">
+                {% endif %}
+            </div>
+            <div class="section">
+                <h3 class="blue">Cost Function over Simulation Time</h3>
+                {% if filename2 %}
+                <img class="inline_picture" src="{{ filename2 }}?v={{ uuid }}" alt="Cost Function">
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div>
+        <p>No Simulation Results Yet Available!</p>
+    </div>
+    {% endif %}
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2025 Navid Noroozi. All rights reserved.</p>
+    </footer>
+</body>
+</html>

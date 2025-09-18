@@ -1,0 +1,8 @@
+flask
+gunicorn
+matplotlib
+numpy
+cvxpy
+ecos
+osqp
+scs
