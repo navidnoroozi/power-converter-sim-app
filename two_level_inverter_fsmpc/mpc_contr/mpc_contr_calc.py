@@ -67,6 +67,10 @@ class MPCSSolver:
         m.setObjective(obj, GRB.MINIMIZE)
         m.optimize()
 
+        # Fall back if no solution found take previous switching
+        if m.status != GRB.OPTIMAL and m.status != GRB.TIME_LIMIT:
+            return s0, float('inf')
+
         # Extract results
         s_seq = [int(round(s[k].X)) for k in range(N)]
         return s_seq, float(m.ObjVal)
