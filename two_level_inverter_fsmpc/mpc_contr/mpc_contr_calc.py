@@ -68,7 +68,7 @@ class MPCSSolver:
         m.optimize()
 
         # Fall back if no solution found take previous switching
-        if m.status != GRB.OPTIMAL and m.status != GRB.TIME_LIMIT:
+        if m.status != GRB.OPTIMAL:
             return s0, float('inf')
 
         # Extract results
