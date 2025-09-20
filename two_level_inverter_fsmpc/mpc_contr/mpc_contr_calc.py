@@ -1,76 +1,173 @@
-from gurobipy import Model, GRB, QuadExpr
+
 import math
+from typing import List, Tuple
+
+try:
+    import gurobipy as gp
+    from gurobipy import GRB
+    _HAS_GUROBI = True
+except Exception:
+    _HAS_GUROBI = False
 
 class MPCSSolver:
-    def __init__(self, cont_horizon=5, lambda_switch=0.1, timelimit=None, mipgap=None):
-        """
-        Gurobi-based MPC solver for a two-level inverter with RL load.
-        - cont_horizon: prediction horizon N
-        - lambda_switch: weight on switch movement (s - s_prev)^2
-        - timelimit: optional time limit in seconds
-        - mipgap: optional relative MIP gap
-        """
-        self.cont_horizon = cont_horizon
-        self.lambda_switch = lambda_switch
-        self.timelimit = timelimit
-        self.mipgap = mipgap
+    """
+    Robust FS-MPC solver wrapper for a single-phase two-level converter.
+    Primary: MILP with Gurobi (if available).
+    Fallback 1: Finite-set brute-force enumeration over 2^N sequences (N = horizon).
+    Fallback 2: Safe-mode PI step and/or repeat-last-action.
+    """
+    def __init__(self, cont_horizon=1, lambda_switch=0.1, timelimit=0.001, mipgap=0.05, threads=1,
+                 safe_Kp=0.2, safe_Ki=50.0, duty_saturation=1.0):
+        self.cont_horizon = int(cont_horizon)
+        self.lambda_switch = float(lambda_switch)
+        self.timelimit = float(timelimit) if timelimit is not None else None
+        self.mipgap = float(mipgap) if mipgap is not None else None
+        self.threads = int(threads) if threads is not None else None
+        # Safe-mode PI on current error
+        self.safe_Kp = float(safe_Kp)
+        self.safe_Ki = float(safe_Ki)
+        self.duty_saturation = float(duty_saturation)
+        self._int_err = 0.0
+        self._last_action = 1  # default +1 state
 
-    def solveMPC(self, inverter, load, currentReference, current_time, i_a_0, s0):
-        """
-        Solves the MIQP with binary switching s[k] ∈ {0,1} and linear dynamics:
-            i[k+1] = (1 - Ts*R/L) * i[k] + (Ts/L * Vdc) * s[k] + Ts/L * (-Vdc/2 - e[k])
-        Objective:
-            sum_{k=1..N} (i[k] - i_ref[k-1])^2 + lambda * sum_{k=0..N-1} (s[k] - s0[k])^2
-        Returns (s_seq, obj_value) where s_seq is a list of 0/1.
-        """
+    # --- Convenience: predict one-step current with Euler ---
+    @staticmethod
+    def _i_next(i, v_inv, v_backemf, R, L, Ts):
+        di_dt = (v_inv - v_backemf - R*i) / L
+        return i + di_dt * Ts
+
+    def _make_refs(self, currentReference, t0) -> List[float]:
+        return list(currentReference.generateRefTrajectory(t0))
+
+    def _make_vbemf_seq(self, f_bemf, V_bemf, t0, Ts, N):
+        seq = []
+        for k in range(N):
+            t = t0 + k*Ts
+            seq.append(V_bemf * math.sin(2*math.pi*f_bemf*t))
+        return seq
+
+    def _cost(self, i_seq, iref_seq, s_seq, s0):
+        J = 0.0
+        for k in range(len(iref_seq)):
+            e = i_seq[k] - iref_seq[k]
+            J += e*e
+            # penalize switch movement relative to "previous plan" s0
+            sk0 = 1 if (k < len(s0) and s0[k]) else 0
+            J += self.lambda_switch * ( (s_seq[k] - sk0) ** 2 )
+        return J
+
+    def _bruteforce(self, inverter, load, currentReference, t0, i0, s0) -> Tuple[List[int], float]:
+        """Exhaustive enumeration of 2^N sequences (N small)."""
         N = self.cont_horizon
         Ts = currentReference.sampling_rate
-        R = load.R
-        L = load.L
         Vdc = inverter.V_dc
+        R, L = load.R, load.L
+        # reference and back-EMF
+        iref = self._make_refs(currentReference, t0)
+        vbemf = self._make_vbemf_seq(load.f_backemf, load.V_backemf, t0, Ts, N)
 
-        # Precompute references and back-EMF
-        i_ref = list(currentReference.generateRefTrajectory(current_time))  # length N
-        e = [load.V_backemf * math.sin(2 * math.pi * load.f_backemf * (current_time + k*Ts)) for k in range(N)]
+        best_J = float('inf')
+        best_seq = [self._last_action] * N
 
-        a = 1.0 - Ts * R / L
-        b = Ts * Vdc / L
-        c = [Ts / L * (-Vdc/2.0 - e_k) for e_k in e]
+        # Generate all sequences by counting 0..(2^N-1)
+        total = 1 << N
+        for mask in range(total):
+            s_seq = [ (mask >> k) & 1 for k in range(N) ]  # LSB = step 0
+            # Predict current over horizon
+            i = i0
+            i_seq = []
+            for k in range(N):
+                v_inv = Vdc * (2*s_seq[k]-1) / 2.0
+                i = self._i_next(i, v_inv, vbemf[k], R, L, Ts)
+                i_seq.append(i)
+            J = self._cost(i_seq, iref, s_seq, s0)
+            if J < best_J:
+                best_J = J
+                best_seq = s_seq
 
-        m = Model("fsmpc")
-        m.Params.OutputFlag = 0
-        if self.timelimit is not None:
-            m.Params.TimeLimit = float(self.timelimit)
-        if self.mipgap is not None:
-            m.Params.MIPGap = float(self.mipgap)
+        return best_seq, best_J
 
-        # Variables
-        s = m.addVars(N, vtype=GRB.BINARY, name="s")
-        i = m.addVars(N+1, lb=-GRB.INFINITY, name="i")
+    def _safe_mode(self, i0, iref0) -> int:
+        """PI on current error -> duty -> choose nearest switch state."""
+        e = iref0 - i0
+        Ts_eff = 1e-4  # tiny stabilizing step for integral (won't matter much)
+        self._int_err += e * Ts_eff
+        duty = self.safe_Kp*e + self.safe_Ki*self._int_err
+        # saturate
+        duty = max(-self.duty_saturation, min(self.duty_saturation, duty))
+        s = 1 if duty >= 0 else 0
+        return s
 
-        # Initial condition
-        m.addConstr(i[0] == i_a_0, name="i0")
+    def solveMPC(self, inverter, load, currentReference, current_time, i_a_0, s0):
+        N = self.cont_horizon
+        Ts = currentReference.sampling_rate
+        Vdc = inverter.V_dc
+        R, L = load.R, load.L
 
-        # Dynamics
-        for k in range(N):
-            m.addConstr(i[k+1] == a * i[k] + b * s[k] + c[k], name=f"dyn_{k}")
+        # quick single-step fallback if horizon is weird
+        if N <= 0:
+            return [self._last_action], 0.0
 
-        # Objective: tracking + switching regularization
-        obj = QuadExpr()
-        for k in range(1, N+1):
-            obj.add((i[k] - i_ref[k-1]) * (i[k] - i_ref[k-1]))
-        for k in range(N):
-            diff = s0[k] - 1 if isinstance(s0[k], bool) and s0[k] else s0[k]
-            # s0 is list of bools; (s - s0)^2 simplifies but we keep quadratic form:
-            obj.add(self.lambda_switch * (s[k] - (1 if s0[k] else 0)) * (s[k] - (1 if s0[k] else 0)))
+        # references and back-emf sequences
+        iref = self._make_refs(currentReference, current_time)
+        vbemf = self._make_vbemf_seq(load.f_backemf, load.V_backemf, current_time, Ts, N)
 
-        m.setObjective(obj, GRB.MINIMIZE)
-        m.optimize()
+        # Try Gurobi (if available)
+        if _HAS_GUROBI:
+            try:
+                m = gp.Model("fsmpc")
+                m.Params.OutputFlag = 0
+                if self.timelimit is not None:
+                    m.Params.TimeLimit = self.timelimit
+                if self.mipgap is not None:
+                    m.Params.MIPGap = self.mipgap
+                if self.threads is not None:
+                    m.Params.Threads = self.threads
+                # Numerical hygiene
+                m.Params.NumericFocus = 3
+                m.Params.ScaleFlag = 2
 
-        # Fall back if no solution found take previous switching
-        if m.status != GRB.OPTIMAL:
-            return s0, float('inf')
+                # Variables
+                s = m.addVars(N, vtype=GRB.BINARY, name="s")
+                i = m.addVars(N+1, lb=-GRB.INFINITY, name="i")
 
-        # Extract results
-        s_seq = [int(round(s[k].X)) for k in range(N)]
-        return s_seq, float(m.ObjVal)
+                # Initial condition
+                m.addConstr(i[0] == float(i_a_0))
+
+                # Dynamics
+                for k in range(N):
+                    v_inv_k = (Vdc/2.0) * (2*s[k]-1)
+                    rhs = i[k] + Ts * ((v_inv_k - vbemf[k] - R*i[k]) / L)
+                    m.addConstr(i[k+1] == rhs, name=f"dynamics_{k}")
+
+                # Objective
+                obj = gp.QuadExpr(0.0)
+                for k in range(N):
+                    obj += (i[k+1] - float(iref[k]))*(i[k+1] - float(iref[k]))
+                    sk0 = 1 if (k < len(s0) and s0[k]) else 0
+                    obj += self.lambda_switch * ( (s[k] - sk0) * (s[k] - sk0) )
+
+                m.setObjective(obj, GRB.MINIMIZE)
+                m.optimize()
+
+                if m.Status == GRB.OPTIMAL or m.Status == GRB.TIME_LIMIT:
+                    # If time limit, Gurobi still gives best incumbent if any
+                    if m.SolCount > 0:
+                        s_seq = [int(round(s[k].X)) for k in range(N)]
+                        self._last_action = s_seq[0]
+                        return s_seq, float(m.ObjVal if m.SolCount>0 else 0.0)
+
+            except Exception as _e:
+                # Will fall back below
+                pass
+
+        # Fallback 1: brute-force enumeration
+        try:
+            seq, J = self._bruteforce(inverter, load, currentReference, current_time, i_a_0, s0)
+            self._last_action = seq[0]
+            return seq, float(J)
+        except Exception:
+            # Fallback 2: safe-mode single step, repeat across horizon
+            s = self._safe_mode(i_a_0, iref[0])
+            self._last_action = s
+            return [s]*N, 1e9  # big cost to indicate fallback used

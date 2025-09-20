@@ -27,7 +27,12 @@ def sim_executor(load, inverter, mpc, currentReference, s0, t_0 = 0, i_a_0 = 0, 
     """
     current_time = t_0
     while current_time < sim_time:
-        s_sig, cost_func_val_np = mpc.solveMPC(inverter,load,currentReference,current_time,i_a_0,s0)
+        try:
+            s_sig, cost_func_val_np = mpc.solveMPC(inverter,load,currentReference,current_time,i_a_0,s0)
+        except Exception:
+            # Hard fallback: repeat last action
+            s_sig = [getattr(mpc, '_last_action', 1)]*mpc.cont_horizon
+            cost_func_val_np = 1e9
         i_a_next = load.calculateLoadDynamics(i_a_0,inverter.generateOutputVoltage([s_sig[0]]),current_time,sampling_rate)[-1]
         i_ref_next = currentReference.generateRefTrajectory(current_time)
         i_a_traj.append(i_a_next)
