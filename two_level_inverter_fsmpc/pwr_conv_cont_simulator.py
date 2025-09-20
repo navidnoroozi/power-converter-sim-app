@@ -61,7 +61,7 @@ def simPowerConvControlSyst(
     powerCurrentHandler = RequiredPowerCurrentHandler(P_req, Q_req, V_rms_req)
     I_ref_peak, phi_ref = powerCurrentHandler.calculateCurrentMagnitudeAndPhase()
     currentReference = CurrentReference(sampling_rate, cont_horizon, I_ref_peak, phi_ref, f_ref)
-    mpc = MPCSSolver(cont_horizon=cont_horizon, timelimit=0.001, mipgap=0.05, threads=1)
+    mpc = MPCSSolver(cont_horizon=cont_horizon, timelimit=0.001, mipgap=0.05, threads=1, use_gurobi=False)
 
     s0 = list(islice(cycle([True, False]), cont_horizon))
 
