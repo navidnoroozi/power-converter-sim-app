@@ -2,7 +2,7 @@ FROM python:3.13.5
 
 WORKDIR /app
 
-# Install system dependencies for numpy, matplotlib, cvxpy, solvers
+# Install system dependencies for numpy, plotly, cvxpy, solvers
 RUN apt-get update && apt-get install -y \
     gcc g++ gfortran \
     libblas-dev liblapack-dev \
