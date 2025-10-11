@@ -1,20 +1,17 @@
 from itertools import islice, cycle
 import math
 import os
-import uuid
+import json
 from two_level_inverter_fsmpc.power_current_conv.power_current_handler import RequiredPowerCurrentHandler
 from two_level_inverter_fsmpc.mpc_contr.mpc_contr_calc import MPCSSolver
 from two_level_inverter_fsmpc.load.load_dyn_cal import Load
 from two_level_inverter_fsmpc.inverter.inverter_behave import Inverter
 from two_level_inverter_fsmpc.current_reference.current_ref_gen import CurrentReference
 from two_level_inverter_fsmpc.scenario_executor.scenario_exc import sim_executor
-# import matplotlib.pyplot as plt
-# import matplotlib
-# matplotlib.use("Agg")
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
-# --- New imports for strict lifecycle ---
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
 
 # Ensure static/plots exists
 PLOT_FOLDER = os.path.join("static", "plots")
@@ -50,8 +47,8 @@ def simPowerConvControlSyst(
         V_backemf (float): Back EMF voltage (V)
         f_ref (float): Reference frequency (Hz)
     Returns:
-        filename1 (str): Filename of the first plot (switching signal and load current)
-        filename2 (str): Filename of the second plot (cost function value)    
+        fig1 (plotly.graph_objs._figure.Figure): Plotly figure object for switching signal and load current
+        fig2 (plotly.graph_objs._figure.Figure): Plotly figure object for cost function value
     """
 
     V_dc = V_rms_req * math.sqrt(2) * 2
@@ -69,55 +66,56 @@ def simPowerConvControlSyst(
         load, inverter, mpc, currentReference, s0, t_0, i_a_0, sampling_rate, sim_time
     )
 
-    filename1 = f"simulation_{uuid.uuid4().hex}.png"
-    plot_path1 = os.path.join(PLOT_FOLDER, filename1)
-    filename2 = f"simulation_{uuid.uuid4().hex}.png"
-    plot_path2 = os.path.join(PLOT_FOLDER, filename2)
-
     # === Plot 1: Switching signal + Load current ===
-    fig1 = Figure(figsize=(8, 6))
-    axs = fig1.subplots(2, 1)
+    fig1 = make_subplots(rows=2, cols=1,
+                         subplot_titles=("Switching Signal", "Load Current"),
+                         shared_xaxes=True,vertical_spacing=0.12)
 
-    axs[0].step(t_sim, s_traj, label="Switching Signal s")
-    axs[0].set_title("Switching Signal")
-    axs[0].set_xlabel("Time (s)")
-    axs[0].set_ylabel("s")
-    axs[0].grid()
-    axs[0].legend()
-    axs[0].set_xlim([t_0, sim_time])
-
-    axs[1].plot(t_sim, i_a_traj, label="Load Current i_a")
-    axs[1].plot(t_sim, i_ref_traj, "--", label="Reference Current i_a_ref")
-    axs[1].set_title("Load Current")
-    axs[1].set_xlabel("Time (s)")
-    axs[1].set_ylabel("i_a (A)")
-    axs[1].grid()
-    axs[1].legend()
-    axs[1].set_xlim([t_0, sim_time])
-
-    fig1.tight_layout()
-    canvas1 = FigureCanvas(fig1)
-    canvas1.print_png(open(plot_path1, "wb"))
-    fig1.clf()
-
+    # Switching signal
+    fig1.add_trace(go.Scatter(x=t_sim, y=s_traj, mode="lines",
+                              name="Switching Signal s",
+                              line=dict(shape="hv")), row=1, col=1)
+    
+    fig1.update_yaxes(title_text="s", row=1, col=1)
+    fig1.update_xaxes(title_text="Time (s)", row=1, col=1)
+    
+    # Load current
+    fig1.add_trace(go.Scatter(x=t_sim, y=i_a_traj, mode="lines",
+                              name="Load Current i_a"), row=2, col=1)
+    fig1.add_trace(go.Scatter(x=t_sim, y=i_ref_traj, mode="lines",
+                              line=dict(dash="dash"),
+                              name="Reference Current i_a_ref"), row=2, col=1)
+    fig1.update_yaxes(title_text="i_a (A)", row=2, col=1)
+    fig1.update_xaxes(title_text="Time (s)", row=2, col=1)
+    # Layout tweaks
+    fig1.update_layout(
+        height=600,
+        width=600,
+        template="simple_white",
+        showlegend=True,
+        margin=dict(l=60, r=30, t=60, b=60),  # tighter margins
+    legend=dict(
+        x=0.02,      # left edge (0 = far left, 1 = far right)
+        y=0.98,      # top edge (0 = bottom, 1 = top)
+        bgcolor="rgba(255,255,255,0.5)"  # semi-transparent
+    ))
     # === Plot 2: Cost function ===
-    fig2 = Figure(figsize=(8, 4))
-    ax = fig2.subplots()
+    fig2 = go.Figure()
+    fig2.add_trace(go.Scatter(x=t_sim, y=cost_func_val, mode="lines",
+                              name="Cost Function Value"))
+    # Layout tweaks
+    fig2.update_layout(
+        xaxis_title="Time (s)",
+        yaxis_title="Cost Function Value",
+        height=400,
+        width=600,
+        template="simple_white",
+        showlegend=True,
+        margin=dict(l=60, r=30, t=60, b=60),  # tighter margins
+    legend=dict(
+        x=0.02,      # left edge (0 = far left, 1 = far right)
+        y=0.98,      # top edge (0 = bottom, 1 = top)
+        bgcolor="rgba(255,255,255,0.5)"  # semi-transparent
+    ))
 
-    ax.plot(t_sim, cost_func_val, label="Cost Function Value")
-    ax.set_title("Cost Function Value Over Time")
-    ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Cost Function Value")
-    ax.grid()
-    ax.legend()
-    ax.set_xlim([t_0, sim_time])
-
-    fig2.tight_layout()
-    canvas2 = FigureCanvas(fig2)
-    canvas2.print_png(open(plot_path2, "wb"))
-    fig2.clf()
-
-    # Explicit cleanup
-    del fig1, fig2, axs, ax, canvas1, canvas2
-
-    return filename1, filename2
+    return fig1, fig2

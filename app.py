@@ -1,8 +1,7 @@
-from flask import Flask, render_template, request, url_for
+from flask import Flask, render_template, request, jsonify
 from two_level_inverter_fsmpc.pwr_conv_cont_simulator import simPowerConvControlSyst
 import os
 import glob
-import uuid  # Remove this line if you no longer use uuid for filenames
 
 app = Flask(__name__)
 
@@ -79,7 +78,7 @@ def index():
         i_a_0 = 5.0  # Initial current fixed to 5.0 A
 
         ## Run the simulation
-        filename1,filename2 = simPowerConvControlSyst(
+        fig1,fig2 = simPowerConvControlSyst(
             P_req,
             Q_req,
             V_rms_req,
@@ -94,13 +93,19 @@ def index():
             f_ref
         )
 
-        return render_template("index.html",
-            filename1=url_for("static", filename=f"plots/{filename1}"),
-            filename2=url_for("static", filename=f"plots/{filename2}"),
-            uuid=uuid.uuid4().hex
-        )
-    return render_template("index.html", filename1=None, filename2=None,
-            uuid=uuid.uuid4().hex)
+        fig1_dict = fig1.to_plotly_json()
+        fig2_dict = fig2.to_plotly_json()
+        
+        return render_template("index.html", fig1=fig1_dict, fig2=fig2_dict)
+    
+    return render_template("index.html", fig1=None, fig2=None)
+
+# Optional AJAX endpoint (see next section)
+@app.post("/api/run-sim")
+def api_run_sim():
+    data = request.get_json()
+    fig1, fig2 = simPowerConvControlSyst(**data)  # expects keys matching the function signature
+    return jsonify(fig1=fig1.to_plotly_json(), fig2=fig2.to_plotly_json())
 
 if __name__ == "__main__":
     app.run(debug=True)

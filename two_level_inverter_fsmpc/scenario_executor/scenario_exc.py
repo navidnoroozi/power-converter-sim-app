@@ -1,10 +1,3 @@
-# === Simulation Parameters ===
-i_a_traj = []
-i_ref_traj = []
-s_traj = []
-cost_func_val = []
-t_sim = []
-
 # === Run the simulation ===
 def sim_executor(load, inverter, mpc, currentReference, s0, t_0 = 0, i_a_0 = 0, sampling_rate = 1e-4, sim_time = 0.1):
     """ Runs the simulation for the given parameters.
@@ -25,6 +18,12 @@ def sim_executor(load, inverter, mpc, currentReference, s0, t_0 = 0, i_a_0 = 0, 
     - t_sim: Time vector for the simulation.
     - cost_func_val: Cost function values over time.
     """
+    # Fresh lists for every run (no leakage between runs)
+    i_a_traj = []
+    i_ref_traj = []
+    s_traj = []
+    cost_func_val = []
+    t_sim = []
     current_time = t_0
     while current_time < sim_time:
         try:
